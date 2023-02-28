@@ -6,7 +6,7 @@ from misc import torchutils
 from net import resnet50
 
 
-class Net(nn.Module):
+class Net(nn.Module): # train_CAM: a simple resnet
 
     def __init__(self, stride=16, n_classes=20):
         super(Net, self).__init__()
