@@ -99,7 +99,7 @@ class Net_CAM_Feature(Net): # train_ReCAM: a simple resnet
         
         return x,cams_feature,cams
 
-class CAM(Net):
+class CAM(Net): #make_recam
 
     def __init__(self, stride=16,n_classes=20):
         super(CAM, self).__init__(stride=stride,n_classes=n_classes)
@@ -121,8 +121,8 @@ class CAM(Net):
         x = self.stage1(x)
         x = self.stage2(x)
         x = self.stage3(x)
-        x = self.stage4(x)
-        x = F.conv2d(x, weight)
+        x = self.stage4(x) # bs*2048*32*32
+        x = F.conv2d(x, weight) # bs*20*32*32
         
         if separate:
             return x
