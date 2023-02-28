@@ -51,7 +51,7 @@ class Net(nn.Module): # train_CAM: a simple resnet
 
         return (list(self.backbone.parameters()), list(self.newly_added.parameters()))
 
-class Net_CAM(Net):
+class Net_CAM(Net): # a resnet to generate CAM
 
     def __init__(self,stride=16,n_classes=20):
         super(Net_CAM, self).__init__(stride=stride,n_classes=n_classes)
@@ -62,18 +62,18 @@ class Net_CAM(Net):
         x = self.stage2(x)
 
         x = self.stage3(x)
-        feature = self.stage4(x)
+        feature = self.stage4(x) # bs*2048*32*32
 
-        x = torchutils.gap2d(feature, keepdims=True)
-        x = self.classifier(x)
-        x = x.view(-1, self.n_classes)
+        x = torchutils.gap2d(feature, keepdims=True) # bs*2048*1*1
+        x = self.classifier(x)  # bs*20*1*1
+        x = x.view(-1, self.n_classes) # bs*20
 
-        cams = F.conv2d(feature, self.classifier.weight)
-        cams = F.relu(cams)
+        cams = F.conv2d(feature, self.classifier.weight) # bs*20*32*32
+        cams = F.relu(cams) # bs*20*32*32
         
         return x,cams,feature
 
-class Net_CAM_Feature(Net):
+class Net_CAM_Feature(Net): # train_ReCAM: a simple resnet
 
     def __init__(self,stride=16,n_classes=20):
         super(Net_CAM_Feature, self).__init__(stride=stride,n_classes=n_classes)
@@ -86,16 +86,16 @@ class Net_CAM_Feature(Net):
         x = self.stage3(x)
         feature = self.stage4(x) # bs*2048*32*32
 
-        x = torchutils.gap2d(feature, keepdims=True)
-        x = self.classifier(x)
-        x = x.view(-1, self.n_classes)
+        x = torchutils.gap2d(feature, keepdims=True) # bs*2048*1*1
+        x = self.classifier(x) # bs*20*1*1
+        x = x.view(-1, self.n_classes) # bs*20
 
-        cams = F.conv2d(feature, self.classifier.weight)
-        cams = F.relu(cams)
-        cams = cams/(F.adaptive_max_pool2d(cams, (1, 1)) + 1e-5)
+        cams = F.conv2d(feature, self.classifier.weight) # bs*20*32*32
+        cams = F.relu(cams) # bs*20*32*32
+        cams = cams/(F.adaptive_max_pool2d(cams, (1, 1)) + 1e-5)  # bs*20*32*32
         cams_feature = cams.unsqueeze(2)*feature.unsqueeze(1) # bs*20*2048*32*32
-        cams_feature = cams_feature.view(cams_feature.size(0),cams_feature.size(1),cams_feature.size(2),-1)
-        cams_feature = torch.mean(cams_feature,-1)
+        cams_feature = cams_feature.view(cams_feature.size(0),cams_feature.size(1),cams_feature.size(2),-1) # bs*20*2048*1024
+        cams_feature = torch.mean(cams_feature,-1) # bs*20*2048
         
         return x,cams_feature,cams
 
@@ -150,14 +150,16 @@ class Class_Predictor(nn.Module):
         self.num_classes = num_classes
         self.classifier = nn.Conv2d(representation_size, num_classes, 1, bias=False)
 
-    def forward(self, x, label):
+    def forward(self, x, label):#x: bs*20*2048 (cam_feature) label: bs*20
         batch_size = x.shape[0]
         x = x.reshape(batch_size,self.num_classes,-1) # bs*20*2048
         mask = label>0 # bs*20
 
         feature_list = [x[i][mask[i]] for i in range(batch_size)] # bs*n*2048
-        prediction = [self.classifier(y.unsqueeze(-1).unsqueeze(-1)).squeeze(-1).squeeze(-1) for y in feature_list]
-        labels = [torch.nonzero(label[i]).squeeze(1) for i in range(label.shape[0])]
+        prediction = [self.classifier(y.unsqueeze(-1).unsqueeze(-1)).squeeze(-1).squeeze(-1) for y in feature_list] # bs*n*20
+        labels = [torch.nonzero(label[i]).squeeze(1) for i in range(label.shape[0])] # bs*1
+        #label=torch.Tensor([1,0,1,0]) labels=torch.nonzero(label) labels=[[0],[2]]
+        #label.shape=[4] labels.shape=[2,1]
 
         loss = 0
         acc = 0
