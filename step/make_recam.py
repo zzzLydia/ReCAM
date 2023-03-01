@@ -39,14 +39,14 @@ def _work(process_id, model, dataset, args):
             outputs = [model.forward2(img[0].cuda(non_blocking=True),recam_predictor.classifier.weight) for img in pack['img']] # b x 20 x w x h
 
             strided_cam = torch.sum(torch.stack(
-                [F.interpolate(torch.unsqueeze(o, 0), strided_size, mode='bilinear', align_corners=False)[0] for o in outputs]), 0)
+                [F.interpolate(torch.unsqueeze(o, 0), strided_size, mode='bilinear', align_corners=False)[0] for o in outputs]), 0) # 20 x w x h
 
             highres_cam = [F.interpolate(torch.unsqueeze(o, 1), strided_up_size,
                                          mode='bilinear', align_corners=False) for o in outputs]
             highres_cam = torch.sum(torch.stack(highres_cam, 0), 0)[:, 0, :size[0], :size[1]]
             valid_cat = torch.nonzero(label)[:, 0]
 
-            strided_cam = strided_cam[valid_cat]
+            strided_cam = strided_cam[valid_cat] 
             strided_cam /= F.adaptive_max_pool2d(strided_cam, (1, 1)) + 1e-5
 
             highres_cam = highres_cam[valid_cat]
